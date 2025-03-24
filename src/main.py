@@ -5,6 +5,8 @@ from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 def evaluate_predictions(actual, predictions):
     """
@@ -98,25 +100,97 @@ def calculate_atr(df, period=14):
     
     return true_range.rolling(period).mean()
 
+def plot_predictions(actual, predicted, save_path='analysis_results.png'):
+    """
+    Membuat visualisasi hasil prediksi yang lebih baik
+    """
+    # Buat figure dengan 2 subplot
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10), height_ratios=[2, 1])
+    
+    # Set style
+    plt.style.use('seaborn')
+    
+    # Plot harga di subplot pertama
+    ax1.plot(actual, label='Harga Aktual', color='blue', linewidth=2)
+    ax1.plot(predicted, label='Prediksi', color='red', linestyle='--', linewidth=2)
+    
+    # Customize plot harga
+    ax1.set_title(f'Prediksi Harga Bitcoin (MAPE: {calculate_mape(actual, predicted):.2f}%)', 
+                  fontsize=14, pad=20)
+    ax1.set_xlabel('Periode', fontsize=12)
+    ax1.set_ylabel('Harga (USD)', fontsize=12)
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(fontsize=10)
+    
+    # Tambahkan status harga
+    last_actual = actual[-1]
+    last_pred = predicted[-1]
+    status = "NETRAL"
+    if last_pred > last_actual * 1.01:
+        status = "BULLISH"
+    elif last_pred < last_actual * 0.99:
+        status = "BEARISH"
+    
+    # Tambahkan text status
+    ax1.text(0.02, 0.95, f'Status Harga: {status}',
+             transform=ax1.transAxes,
+             fontsize=12,
+             bbox=dict(facecolor='white', alpha=0.8))
+    
+    # Adjust layout
+    plt.tight_layout()
+    
+    # Save plot
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    print(f"\nVisualisasi disimpan di '{save_path}'")
+    
+    # Close plot untuk menghemat memori
+    plt.close()
+
+def calculate_mape(actual, predicted):
+    """
+    Menghitung MAPE
+    """
+    return np.mean(np.abs((actual - predicted) / actual)) * 100
+
+def calculate_rsi(prices, periods=14):
+    """
+    Menghitung Relative Strength Index
+    """
+    deltas = np.diff(prices)
+    seed = deltas[:periods+1]
+    up = seed[seed >= 0].sum()/periods
+    down = -seed[seed < 0].sum()/periods
+    rs = up/down
+    rsi = np.zeros_like(prices)
+    rsi[:periods] = 100. - 100./(1. + rs)
+    
+    for i in range(periods, len(prices)):
+        delta = deltas[i - 1]
+        if delta > 0:
+            upval = delta
+            downval = 0.
+        else:
+            upval = 0.
+            downval = -delta
+            
+        up = (up*(periods - 1) + upval)/periods
+        down = (down*(periods - 1) + downval)/periods
+        rs = up/down
+        rsi[i] = 100. - 100./(1. + rs)
+        
+    return rsi
+
 def main():
     try:
         print("\nMemulai analisis cryptocurrency...\n")
         
-        # Load data
-        print("1. Mengambil data...")
+        # Load dan prepare data
         df = load_data()
-        
-        if df is None or df.empty:
-            raise ValueError("Tidak bisa mendapatkan data cryptocurrency")
-        
-        # Prepare data
-        print("\n2. Mempersiapkan data...")
         close_prices = df['Close'].values.reshape(-1, 1)
         
-        # Initialize predictor
+        # Initialize dan train model
         predictor = CryptoPredictor()
-        
-        # Prepare sequences
         X, y = predictor.prepare_sequences(close_prices)
         
         # Split data
@@ -126,21 +200,19 @@ def main():
         y_train = y[:train_size]
         y_test = y[train_size:]
         
-        # Build and train model
-        print("\n3. Melatih model...")
+        # Train model
         predictor.build_model((predictor.seq_length, 1))
         predictor.train(X_train, y_train)
         
         # Make predictions
-        print("\n4. Melakukan prediksi...")
         y_pred = predictor.model.predict(X_test, verbose=0)
         
-        # Inverse transform predictions
+        # Inverse transform
         y_test_actual = predictor.scaler.inverse_transform(y_test.reshape(-1, 1))
         y_pred_actual = predictor.scaler.inverse_transform(y_pred)
         
         # Calculate MAPE
-        mape = np.mean(np.abs((y_test_actual - y_pred_actual) / y_test_actual)) * 100
+        mape = calculate_mape(y_test_actual, y_pred_actual)
         print(f"\nHasil MAPE: {mape:.2f}%")
         
         # Save predictions
@@ -149,15 +221,20 @@ def main():
             'Predicted': y_pred_actual.flatten()
         })
         results.to_csv('predictions.csv', index=False)
-        print("\nHasil prediksi disimpan di 'predictions.csv'")
+        
+        # Create visualization
+        plot_predictions(
+            actual=results['Actual'].values,
+            predicted=results['Predicted'].values
+        )
         
         print("\nSelesai!")
         return True
         
     except Exception as e:
-        print(f"\nTerjadi error dalam program utama:")
-        print(f"Error type: {type(e).__name__}")
-        print(f"Error message: {str(e)}")
+        print(f"\nTerjadi error:")
+        print(f"Type: {type(e).__name__}")
+        print(f"Message: {str(e)}")
         return False
 
 if __name__ == "__main__":
