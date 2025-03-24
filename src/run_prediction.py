@@ -1,4 +1,4 @@
-from src.main import main
+from main import main
 import matplotlib.pyplot as plt
 
 def plot_predictions(actual, predictions):
