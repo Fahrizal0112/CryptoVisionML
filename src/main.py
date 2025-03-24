@@ -30,5 +30,7 @@ def main():
         print("Prediksi selesai!")
         print(f"RMSE: {np.sqrt(np.mean((predictions - actual) ** 2))}")
 
+        return actual.flatten(), predictions.flatten()
+    return None, None
 if __name__ == "__main__":
     main()
