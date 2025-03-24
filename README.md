@@ -3,7 +3,7 @@
 - **Nama Proyek**: CryptoVision Pro
 - **Tagline**: "Prediksi Cerdas, Investasi Bijak"
 - **Versi**: 1.0.0
-- **Target Peluncuran**: Q3 2024
+- **Target Peluncuran**: Q3 2025
 - **Platform**: Web-based Application
 - **Target Pengguna**: Trader crypto, investor, dan enthusiast cryptocurrency
 
